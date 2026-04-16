@@ -1,0 +1,12 @@
+{
+  "name": "@demo/lens-login",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client/index.ts",
+    "./server": "./src/server/index.ts",
+    "./shared": "./src/shared/types.ts"
+  }
+}
