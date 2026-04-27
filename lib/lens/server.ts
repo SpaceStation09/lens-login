@@ -1,13 +1,10 @@
 import { setSessionCookie } from "@/lib/auth/session";
 import {
-  createChallenge,
   createLensIdentity,
   createSession,
   createUser,
-  getChallengeById,
   getIdentityByProviderSubject,
   getUserById,
-  markChallengeUsed,
 } from "@/lib/db/store";
 import { createLensLoginServer as createSdkLensLoginServer, LensLoginServerError } from "@demo/lens-login/server";
 
@@ -16,9 +13,6 @@ export { LensLoginServerError };
 export function createLensLoginServer() {
   return createSdkLensLoginServer({
     storage: {
-      createChallenge,
-      getChallengeById,
-      markChallengeUsed,
       getIdentityByProviderSubject,
       async createLensIdentity(input) {
         return createLensIdentity({

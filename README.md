@@ -6,7 +6,8 @@ POC demo for a `Login with Lens` flow that can coexist with a classic email/pass
 
 - Email registration and login
 - Lens account discovery from a wallet
-- Challenge/signature verification on the server
+- Lens native authentication with client-side `SessionClient`
+- Server-side Lens ID token verification through JWKS
 - Automatic local user creation for Lens-first login
 - Binding a Lens identity to an existing email user
 
@@ -33,6 +34,7 @@ Optional environment variables:
 ```bash
 NEXT_PUBLIC_PRIVY_APP_ID=your-privy-app-id
 NEXT_PUBLIC_LENS_ENV=testnet
+NEXT_PUBLIC_LENS_APP_ADDRESS=your-lens-app-address
 NEXT_PUBLIC_APP_ORIGIN=http://localhost:3000
 SESSION_SECRET=replace-me
 ```
@@ -42,3 +44,4 @@ SESSION_SECRET=replace-me
 - The demo stores data in `data/demo.sqlite` for simplicity.
 - Strict mode is enabled: the wallet must already control a Lens account.
 - The login subject is the Lens account, not the wallet address.
+- The server trusts verified Lens ID token claims, not client-submitted account addresses.

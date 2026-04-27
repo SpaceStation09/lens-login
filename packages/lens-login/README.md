@@ -19,10 +19,12 @@ const client = createLensLoginClient({
 
 const walletAddress = await client.connectWallet()
 const accounts = await client.discoverAccounts({ walletAddress })
-const result = await client.authenticate({
+
+// After completing Lens native login in the browser, submit the Lens ID token
+// to the app server so it can verify the session and create a local session.
+const result = await client.verifySession({
   type: "login",
-  walletAddress,
-  lensAccountAddress: accounts.accounts[0].accountAddress,
+  idToken,
 })
 ```
 
@@ -41,9 +43,6 @@ const server = createLensLoginServer({
 
 Required server dependencies:
 
-- `storage.createChallenge`
-- `storage.getChallengeById`
-- `storage.markChallengeUsed`
 - `storage.getIdentityByProviderSubject`
 - `storage.createLensIdentity`
 - `setSession`
@@ -61,6 +60,5 @@ Important public types:
 - `LensLoginServerOptions<TUser>`
 - `LensLoginServer<TUser>`
 - `LensAccountsRequest`
-- `LensChallengeRequest`
-- `LensVerifyRequest`
+- `LensSessionRequest`
 - `LensVerifyResponse<TUser>`

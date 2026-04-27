@@ -26,10 +26,8 @@ export type LensApiErrorCode =
   | "UNAUTHORIZED"
   | "INTERNAL_ERROR"
   | "LENS_ACCOUNT_NOT_CONTROLLED"
-  | "CHALLENGE_NOT_FOUND"
-  | "CHALLENGE_ALREADY_USED"
-  | "CHALLENGE_EXPIRED"
-  | "INVALID_SIGNATURE"
+  | "INVALID_ID_TOKEN"
+  | "UNSUPPORTED_LENS_ROLE"
   | "IDENTITY_ALREADY_LINKED";
 
 export type LensApiError = {
@@ -49,24 +47,9 @@ export type LensAccountsResponse = {
   accounts: LensDiscoveredAccount[];
 };
 
-export type LensChallengeRequest = {
+export type LensSessionRequest = {
   type: LensAuthIntent;
-  walletAddress: string;
-  lensAccountAddress: string;
-};
-
-export type LensChallengeResponse = {
-  challengeId: string;
-  type: LensAuthIntent;
-  walletAddress: string;
-  lensAccountAddress: string;
-  message: string;
-  expiresAt: string;
-};
-
-export type LensVerifyRequest = {
-  challengeId: string;
-  signature: `0x${string}`;
+  idToken: string;
 };
 
 export type LensVerifyResponse<User> = {
@@ -94,17 +77,6 @@ export type LensLoginServerCreateIdentityInput = {
   lensPictureUrl: string | null;
 };
 
-export type LensLoginServerStoredChallenge = {
-  id: string;
-  type: LensAuthIntent;
-  walletAddress: string;
-  lensAccountAddress: string;
-  message: string;
-  expiresAt: string;
-  usedAt: string | null;
-  createdByUserId: string | null;
-};
-
 export type LensLoginClientOptions = {
   apiBasePath?: string;
   ethereum?: {
@@ -115,29 +87,11 @@ export type LensLoginClientOptions = {
 
 export type LensLoginClient<User> = {
   connectWallet: () => Promise<string>;
-  signMessage: (message: string) => Promise<`0x${string}`>;
   discoverAccounts: (input: LensAccountsRequest) => Promise<LensAccountsResponse>;
-  createChallenge: (input: LensChallengeRequest) => Promise<LensChallengeResponse>;
-  verify: (input: LensVerifyRequest) => Promise<LensVerifyResponse<User>>;
-  authenticate: (input: {
-    type: LensChallengeRequest["type"];
-    walletAddress: string;
-    lensAccountAddress: string;
-  }) => Promise<LensVerifyResponse<User>>;
+  verifySession: (input: LensSessionRequest) => Promise<LensVerifyResponse<User>>;
 };
 
 export type LensLoginServerStorage = {
-  createChallenge: (input: {
-    type: LensChallengeRequest["type"];
-    nonce: string;
-    walletAddress: string;
-    lensAccountAddress: string;
-    message: string;
-    expiresAt: string;
-    createdByUserId: string | null;
-  }) => Promise<LensLoginServerStoredChallenge>;
-  getChallengeById: (challengeId: string) => Promise<LensLoginServerStoredChallenge | null>;
-  markChallengeUsed: (challengeId: string) => Promise<unknown>;
   getIdentityByProviderSubject: (providerSubject: string) => Promise<LensLoginServerStoredIdentity | null>;
   createLensIdentity: (input: LensLoginServerCreateIdentityInput) => Promise<unknown>;
 };
@@ -145,6 +99,7 @@ export type LensLoginServerStorage = {
 export type LensLoginServerOptions<User extends { id: string }> = {
   environment?: "mainnet" | "testnet";
   origin?: string;
+  appAddress?: string;
   storage: LensLoginServerStorage;
   setSession: (user: User) => Promise<void>;
   findUserById: (userId: string) => Promise<User | null>;
@@ -153,7 +108,6 @@ export type LensLoginServerOptions<User extends { id: string }> = {
 
 export type LensLoginServer<User extends { id: string }> = {
   discoverAccounts: (input: LensAccountsRequest) => Promise<LensAccountsResponse>;
-  createChallenge: (input: LensChallengeRequest & { currentUserId: string | null }) => Promise<LensChallengeResponse>;
-  verifyChallenge: (input: LensVerifyRequest) => Promise<LensVerifyResponse<User>>;
+  verifySession: (input: LensSessionRequest & { currentUserId: string | null }) => Promise<LensVerifyResponse<User>>;
   toErrorResponse: (error: unknown) => { status: number; body: LensApiError };
 };

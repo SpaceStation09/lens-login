@@ -1,4 +1,4 @@
-import type { ChallengeRecord, IdentityRecord, SessionRecord, UserRecord } from "@/lib/db/types";
+import type { IdentityRecord, SessionRecord, UserRecord } from "@/lib/db/types";
 import { sqlite } from "@/lib/db/sqlite";
 import { createId, nowIso } from "@/lib/utils";
 function mapUser(row: {
@@ -46,32 +46,6 @@ function mapIdentity(row: {
     lensPictureUrl: row.lens_picture_url,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-  };
-}
-
-function mapChallenge(row: {
-  id: string;
-  type: "login" | "link";
-  nonce: string;
-  wallet_address: string;
-  lens_account_address: string;
-  message: string;
-  expires_at: string;
-  used_at: string | null;
-  created_by_user_id: string | null;
-  created_at: string;
-}): ChallengeRecord {
-  return {
-    id: row.id,
-    type: row.type,
-    nonce: row.nonce,
-    walletAddress: row.wallet_address,
-    lensAccountAddress: row.lens_account_address,
-    message: row.message,
-    expiresAt: row.expires_at,
-    usedAt: row.used_at,
-    createdByUserId: row.created_by_user_id,
-    createdAt: row.created_at,
   };
 }
 
@@ -169,52 +143,6 @@ export async function createLensIdentity(input: Omit<IdentityRecord, "id" | "cre
     );
 
   return identity;
-}
-
-export async function createChallenge(input: Omit<ChallengeRecord, "id" | "createdAt" | "usedAt">) {
-  const challenge: ChallengeRecord = {
-    ...input,
-    id: createId("chlg"),
-    createdAt: nowIso(),
-    usedAt: null,
-  };
-
-  sqlite
-    .prepare(
-      `INSERT INTO challenges (
-        id, type, nonce, wallet_address, lens_account_address, message,
-        expires_at, used_at, created_by_user_id, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
-      challenge.id,
-      challenge.type,
-      challenge.nonce,
-      challenge.walletAddress,
-      challenge.lensAccountAddress,
-      challenge.message,
-      challenge.expiresAt,
-      challenge.usedAt,
-      challenge.createdByUserId,
-      challenge.createdAt,
-    );
-
-  return challenge;
-}
-
-export async function getChallengeById(challengeId: string) {
-  const row = sqlite.prepare("SELECT * FROM challenges WHERE id = ?").get(challengeId) as Parameters<typeof mapChallenge>[0] | undefined;
-  return row ? mapChallenge(row) : null;
-}
-
-export async function markChallengeUsed(challengeId: string) {
-  const usedAt = nowIso();
-  const result = sqlite.prepare("UPDATE challenges SET used_at = ? WHERE id = ?").run(usedAt, challengeId);
-  if (result.changes === 0) {
-    return null;
-  }
-
-  return getChallengeById(challengeId);
 }
 
 export async function createSession(userId: string) {

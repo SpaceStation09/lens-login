@@ -1,14 +1,10 @@
-import { createWalletClient, custom } from "viem";
-
 import type {
   LensAccountsRequest,
   LensAccountsResponse,
   LensApiError,
-  LensChallengeRequest,
-  LensChallengeResponse,
   LensLoginClient,
   LensLoginClientOptions,
-  LensVerifyRequest,
+  LensSessionRequest,
   LensVerifyResponse,
 } from "../shared/types";
 
@@ -87,23 +83,6 @@ export function createLensLoginClient<User = unknown>(options: LensLoginClientOp
     return wallet.toLowerCase();
   }
 
-  async function signMessage(message: string) {
-    const provider = getInjectedProvider();
-    const walletClient = createWalletClient({
-      transport: custom(provider),
-    });
-
-    const [account] = await walletClient.getAddresses();
-    if (!account) {
-      throw new LensLoginClientError("NO_WALLET_ACCOUNT", "Wallet is not connected.");
-    }
-
-    return walletClient.signMessage({
-      account,
-      message,
-    }) as Promise<`0x${string}`>;
-  }
-
   async function postJson<TResponse>(path: string, body: unknown, fallbackMessage: string): Promise<TResponse> {
     const response = await fetchImpl(`${apiBasePath}${path}`, {
       method: "POST",
@@ -126,29 +105,13 @@ export function createLensLoginClient<User = unknown>(options: LensLoginClientOp
     return postJson<LensAccountsResponse>("/accounts", input, "Failed to load Lens accounts.");
   }
 
-  async function createChallenge(input: LensChallengeRequest) {
-    return postJson<LensChallengeResponse>("/challenge", input, "Failed to create challenge.");
-  }
-
-  async function verify(input: LensVerifyRequest) {
-    return postJson<LensVerifyResponse<User>>("/verify", input, "Lens verification failed.");
-  }
-
-  async function authenticate(input: { type: LensChallengeRequest["type"]; walletAddress: string; lensAccountAddress: string }) {
-    const challenge = await createChallenge(input);
-    const signature = await signMessage(challenge.message);
-    return verify({
-      challengeId: challenge.challengeId,
-      signature,
-    });
+  async function verifySession(input: LensSessionRequest) {
+    return postJson<LensVerifyResponse<User>>("/session", input, "Lens session verification failed.");
   }
 
   return {
     connectWallet,
-    signMessage,
     discoverAccounts,
-    createChallenge,
-    verify,
-    authenticate,
+    verifySession,
   };
 }

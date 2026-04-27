@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { PublicClient, evmAddress, mainnet, testnet } from "@lens-protocol/client";
+import { signMessageWith } from "@lens-protocol/client/viem";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { createWalletClient, custom } from "viem";
 
 import type { LensAuthIntent, LensDiscoveredAccount } from "@/lib/lens/types";
 import { createLensLoginClient } from "@demo/lens-login/client";
@@ -10,6 +13,19 @@ import { createLensLoginClient } from "@demo/lens-login/client";
 type Props = {
   mode: LensAuthIntent;
 };
+
+const lensAppByEnvironment = {
+  mainnet: "0x8A5Cc31180c37078e1EbA2A23c861Acf351a97cE",
+  testnet: "0xC75A89145d765c396fd75CbD16380Eb184Bd2ca7",
+} as const;
+
+function getLensEnvironment() {
+  return process.env.NEXT_PUBLIC_LENS_ENV === "mainnet" ? "mainnet" : "testnet";
+}
+
+function getLensAppAddress() {
+  return process.env.NEXT_PUBLIC_LENS_APP_ADDRESS ?? lensAppByEnvironment[getLensEnvironment()];
+}
 
 function getAccountLabel(account: LensDiscoveredAccount) {
   const fullHandle = account.username?.fullHandle?.trim();
@@ -46,6 +62,15 @@ export function LensAuthPanel({ mode }: Props) {
     () => wallets.find((wallet) => wallet.walletClientType === "privy") ?? wallets[0] ?? null,
     [wallets],
   );
+  const lensEnvironment = getLensEnvironment();
+  const lensAppAddress = getLensAppAddress();
+
+  function createLensClient() {
+    return PublicClient.create({
+      environment: lensEnvironment === "mainnet" ? mainnet : testnet,
+      storage: window.localStorage,
+    });
+  }
 
   async function getLensLoginClient(action: "discover" | "authenticate") {
     if (!ready) {
@@ -128,7 +153,7 @@ export function LensAuthPanel({ mode }: Props) {
 
     setBusy(true);
     setError(null);
-    setNotice("Verifying Lens login...");
+      setNotice("Signing Lens login challenge...");
 
     try {
       const result = await getLensLoginClient("authenticate");
@@ -136,12 +161,44 @@ export function LensAuthPanel({ mode }: Props) {
         return;
       }
 
-      const { client } = result;
+      const { client, walletAddress: connectedWallet } = result;
+      const provider = await activeWallet?.getEthereumProvider();
+      if (!provider) {
+        throw new Error("Wallet provider is not available.");
+      }
 
-      await client.authenticate({
+      const walletClient = createWalletClient({
+        account: evmAddress(connectedWallet),
+        transport: custom(provider),
+      });
+      const lensClient = createLensClient();
+      const authenticated = await lensClient.login({
+        accountOwner: {
+          account: evmAddress(selectedAccount),
+          owner: evmAddress(connectedWallet),
+          app: evmAddress(lensAppAddress),
+        },
+        signMessage: signMessageWith(walletClient),
+      });
+
+      if (authenticated.isErr()) {
+        throw authenticated.error;
+      }
+
+      const credentials = authenticated.value.getCredentials();
+      if (credentials.isErr()) {
+        throw credentials.error;
+      }
+
+      if (!credentials.value?.idToken) {
+        throw new Error("Lens session did not include an ID token.");
+      }
+
+      setNotice("Verifying Lens session with the app server...");
+
+      await client.verifySession({
         type: mode,
-        walletAddress,
-        lensAccountAddress: selectedAccount,
+        idToken: credentials.value.idToken,
       });
 
       router.push("/dashboard");

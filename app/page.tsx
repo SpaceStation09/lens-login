@@ -28,7 +28,7 @@ export default async function HomePage() {
         <div className="list">
           <div className="list-item">Email registration and password login</div>
           <div className="list-item">Wallet discovery plus Lens account selection</div>
-          <div className="list-item">Challenge, signature verification, and local session creation</div>
+          <div className="list-item">Lens native login, ID token verification, and local session creation</div>
           <div className="list-item">Binding a Lens identity to an existing local user</div>
         </div>
       </section>
