@@ -139,13 +139,17 @@ export function createLensLoginServer<User extends { id: string }>(options: Lens
     try {
       const result = await jwtVerify(idToken, jwks, {
         issuer: lensApiBaseUrl,
-        audience: lensAppAddress,
       });
       const payload = result.payload as Record<string, unknown>;
       const role = getStringClaim(payload, "tag:lens.dev,2024:role");
+      const audience = getStringClaim(payload, "aud");
       const signerAddress = getStringClaim(payload, "sub");
       const lensAccountAddress = getActSubject(payload);
       const authenticationId = getStringClaim(payload, "sid");
+
+      if (!audience || normalizeAddress(audience) !== lensAppAddress) {
+        throw new LensLoginServerError("INVALID_ID_TOKEN", "Lens ID token was not issued for this app.", 401);
+      }
 
       if (role !== "ACCOUNT_OWNER" && role !== "ACCOUNT_MANAGER") {
         throw new LensLoginServerError("UNSUPPORTED_LENS_ROLE", "This Lens session role cannot be used to authenticate.", 401);

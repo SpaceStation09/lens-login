@@ -56,7 +56,7 @@ The server does not trust client-submitted Lens account addresses for binding. I
 
 ## Current Auth Flow
 
-1. The browser connects a Privy wallet.
+1. The browser connects MetaMask or another injected EVM wallet.
 2. The browser discovers Lens accounts controlled by that wallet.
 3. The browser calls Lens `PublicClient.login()` for the selected Lens account and obtains a `SessionClient`.
 4. The browser reads `idToken` from `sessionClient.getCredentials()`.

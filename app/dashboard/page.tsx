@@ -11,6 +11,10 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
+  if (!user.username || !user.passwordHash) {
+    redirect("/complete-account");
+  }
+
   const identities = await getIdentitiesForUser(user.id);
   const lensIdentity = identities.find((identity) => identity.provider === "lens");
 
@@ -22,8 +26,8 @@ export default async function DashboardPage() {
         <div className="kv">
           <div className="muted">User ID</div>
           <div>{user.id}</div>
-          <div className="muted">Email</div>
-          <div>{user.email ?? "No email on this user"}</div>
+          <div className="muted">Username</div>
+          <div>{user.username}</div>
           <div className="muted">Created</div>
           <div>{new Date(user.createdAt).toLocaleString()}</div>
         </div>

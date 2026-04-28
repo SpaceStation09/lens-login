@@ -36,7 +36,7 @@ export function createLensLoginServer() {
     findUserById: getUserById,
     async createUser() {
       return createUser({
-        email: null,
+        username: null,
         passwordHash: null,
       });
     },

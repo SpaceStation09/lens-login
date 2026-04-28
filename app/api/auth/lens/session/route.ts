@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { toPublicUser } from "@/lib/auth/public-user";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createLensLoginServer } from "@/lib/lens/server";
 
@@ -20,7 +21,10 @@ export async function POST(request: Request) {
       ...payload,
       currentUserId: user?.id ?? null,
     });
-    return NextResponse.json(result);
+    return NextResponse.json({
+      ...result,
+      user: toPublicUser(result.user),
+    });
   } catch (error) {
     const response = lensLoginServer.toErrorResponse(error);
     return NextResponse.json(response.body, { status: response.status });

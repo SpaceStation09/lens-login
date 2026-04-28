@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 
-import { EmailAuthForm } from "@/components/email-auth-form";
+import { AccountAuthForm } from "@/components/account-auth-form";
 import { LensAuthEntry } from "@/components/lens-auth-entry";
 import { getCurrentUser } from "@/lib/auth/session";
 
@@ -10,6 +10,10 @@ export default async function LoginPage() {
   const user = await getCurrentUser(await cookies());
 
   if (user) {
+    if (!user.username || !user.passwordHash) {
+      redirect("/complete-account");
+    }
+
     redirect("/dashboard");
   }
 
@@ -17,8 +21,8 @@ export default async function LoginPage() {
     <main className="grid">
       <section className="card stack">
         <h1>Login</h1>
-        <p className="muted">Use your existing email account or sign in with a Lens account controlled by your wallet.</p>
-        <EmailAuthForm mode="login" />
+        <p className="muted">Use your existing username/password account or sign in with a Lens account controlled by your wallet.</p>
+        <AccountAuthForm mode="login" />
         <p className="muted">
           Need an account? <Link href="/register">Register first</Link>
         </p>

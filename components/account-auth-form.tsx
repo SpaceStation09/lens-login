@@ -7,9 +7,9 @@ type Props = {
   mode: "login" | "register";
 };
 
-export function EmailAuthForm({ mode }: Props) {
+export function AccountAuthForm({ mode }: Props) {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -19,12 +19,12 @@ export function EmailAuthForm({ mode }: Props) {
     setLoading(true);
     setError(null);
 
-    const response = await fetch(`/api/auth/email/${mode}`, {
+    const response = await fetch(`/api/auth/account/${mode}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
     });
 
     const data = (await response.json()) as { error?: { message?: string } };
@@ -42,13 +42,15 @@ export function EmailAuthForm({ mode }: Props) {
   return (
     <form className="form" onSubmit={onSubmit}>
       <label>
-        Email
+        Username
         <input
-          autoComplete="email"
-          onChange={(event) => setEmail(event.target.value)}
+          autoComplete="username"
+          minLength={3}
+          onChange={(event) => setUsername(event.target.value)}
+          pattern="[A-Za-z0-9_-]+"
           required
-          type="email"
-          value={email}
+          type="text"
+          value={username}
         />
       </label>
       <label>
@@ -64,7 +66,7 @@ export function EmailAuthForm({ mode }: Props) {
       </label>
       {error ? <div className="error">{error}</div> : null}
       <button className="button" disabled={loading} type="submit">
-        {loading ? "Please wait..." : mode === "login" ? "Login with email" : "Create account"}
+        {loading ? "Please wait..." : mode === "login" ? "Login" : "Create account"}
       </button>
     </form>
   );

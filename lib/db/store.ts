@@ -3,14 +3,14 @@ import { sqlite } from "@/lib/db/sqlite";
 import { createId, nowIso } from "@/lib/utils";
 function mapUser(row: {
   id: string;
-  email: string | null;
+  username: string | null;
   password_hash: string | null;
   created_at: string;
   updated_at: string;
 }): UserRecord {
   return {
     id: row.id,
-    email: row.email,
+    username: row.username,
     passwordHash: row.password_hash,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -73,26 +73,39 @@ export async function getUserById(userId: string) {
   return row ? mapUser(row) : null;
 }
 
-export async function getUserByEmail(email: string) {
-  const row = sqlite.prepare("SELECT * FROM users WHERE lower(email) = lower(?)").get(email) as Parameters<typeof mapUser>[0] | undefined;
+export async function getUserByUsername(username: string) {
+  const row = sqlite.prepare("SELECT * FROM users WHERE lower(username) = lower(?)").get(username) as Parameters<typeof mapUser>[0] | undefined;
   return row ? mapUser(row) : null;
 }
 
-export async function createUser(input: Pick<UserRecord, "email" | "passwordHash">) {
+export async function createUser(input: Pick<UserRecord, "username" | "passwordHash">) {
   const timestamp = nowIso();
   const user: UserRecord = {
     id: createId("usr"),
-    email: input.email,
+    username: input.username,
     passwordHash: input.passwordHash,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
 
   sqlite
-    .prepare("INSERT INTO users (id, email, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
-    .run(user.id, user.email, user.passwordHash, user.createdAt, user.updatedAt);
+    .prepare("INSERT INTO users (id, username, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
+    .run(user.id, user.username, user.passwordHash, user.createdAt, user.updatedAt);
 
   return user;
+}
+
+export async function completeUserAccount(userId: string, input: Pick<UserRecord, "username" | "passwordHash">) {
+  const timestamp = nowIso();
+  const result = sqlite
+    .prepare("UPDATE users SET username = ?, password_hash = ?, updated_at = ? WHERE id = ? AND username IS NULL AND password_hash IS NULL")
+    .run(input.username, input.passwordHash, timestamp, userId);
+
+  if (result.changes === 0) {
+    return null;
+  }
+
+  return getUserById(userId);
 }
 
 export async function getIdentitiesForUser(userId: string) {
@@ -143,6 +156,11 @@ export async function createLensIdentity(input: Omit<IdentityRecord, "id" | "cre
     );
 
   return identity;
+}
+
+export async function deleteLensIdentitiesForUser(userId: string) {
+  const result = sqlite.prepare("DELETE FROM identities WHERE user_id = ? AND provider = ?").run(userId, "lens");
+  return result.changes;
 }
 
 export async function createSession(userId: string) {

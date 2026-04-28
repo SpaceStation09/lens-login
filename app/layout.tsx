@@ -16,13 +16,13 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const user = await getCurrentUser(cookieStore);
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
         <div className="shell">
           <header className="topbar">
             <div className="brand">
               <strong>Lens Login Demo</strong>
-              <span className="muted">Email auth plus Lens account login and binding</span>
+              <span className="muted">Username/password auth plus Lens account login and binding</span>
             </div>
             <div className="inline-actions">
               <Link className="button-secondary" href="/">
