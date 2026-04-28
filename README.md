@@ -45,3 +45,9 @@ SESSION_SECRET=replace-me
 - The browser wallet flow uses MetaMask or another injected EVM wallet.
 - The login subject is the Lens account, not the wallet address.
 - The server trusts verified Lens ID token claims, not client-submitted account addresses.
+- The SDK (`packages/lens-login`) does not dictate transport between frontend and backend — the demo app handles HTTP calls in `lib/lens/api.ts`.
+
+## Documentation
+
+- [`docs/sdk-package-structure.md`](docs/sdk-package-structure.md) — SDK architecture, auth flow, and types
+- [`packages/lens-login/README.md`](packages/lens-login/README.md) — SDK API reference

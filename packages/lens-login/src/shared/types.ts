@@ -21,6 +21,13 @@ export type LensVerifiedIdentity = {
   metadata: LensDiscoveredAccount["metadata"];
 };
 
+export type LensIdTokenClaims = {
+  signerAddress: string;
+  lensAccountAddress: string;
+  authenticationId: string;
+  role: "ACCOUNT_OWNER" | "ACCOUNT_MANAGER";
+};
+
 export type LensApiErrorCode =
   | "INVALID_INPUT"
   | "UNAUTHORIZED"
@@ -47,67 +54,30 @@ export type LensAccountsResponse = {
   accounts: LensDiscoveredAccount[];
 };
 
-export type LensSessionRequest = {
-  type: LensAuthIntent;
-  idToken: string;
-};
-
-export type LensVerifyResponse<User> = {
-  ok: true;
-  action: LensAuthIntent;
-  user: User;
-  identity: LensVerifiedIdentity;
-  isNewUser: boolean;
-};
-
-export type LensLoginServerStoredIdentity = {
-  userId: string;
-  providerSubject: string;
-};
-
-export type LensLoginServerCreateIdentityInput = {
-  userId: string;
-  providerSubject: string;
-  walletAddress: string;
-  lensAccountAddress: string;
-  lensUsernameFull: string | null;
-  lensUsernameLocalName: string | null;
-  lensUsernameNamespace: string | null;
-  lensDisplayName: string | null;
-  lensPictureUrl: string | null;
-};
-
 export type LensLoginClientOptions = {
-  apiBasePath?: string;
   ethereum?: {
     request: (request: { method: string; params?: unknown[] }) => Promise<unknown>;
   };
-  fetch?: typeof fetch;
 };
 
-export type LensLoginClient<User> = {
+export type LensLoginClient = {
   connectWallet: () => Promise<string>;
-  discoverAccounts: (input: LensAccountsRequest) => Promise<LensAccountsResponse>;
-  verifySession: (input: LensSessionRequest) => Promise<LensVerifyResponse<User>>;
 };
 
-export type LensLoginServerStorage = {
-  getIdentityByProviderSubject: (providerSubject: string) => Promise<LensLoginServerStoredIdentity | null>;
-  createLensIdentity: (input: LensLoginServerCreateIdentityInput) => Promise<unknown>;
-};
-
-export type LensLoginServerOptions<User extends { id: string }> = {
+export type LensLoginServerOptions = {
   environment?: "mainnet" | "testnet";
   origin?: string;
   appAddress?: string;
-  storage: LensLoginServerStorage;
-  setSession: (user: User) => Promise<void>;
-  findUserById: (userId: string) => Promise<User | null>;
-  createUser: () => Promise<User>;
 };
 
-export type LensLoginServer<User extends { id: string }> = {
+export type LensLoginServer = {
   discoverAccounts: (input: LensAccountsRequest) => Promise<LensAccountsResponse>;
-  verifySession: (input: LensSessionRequest & { currentUserId: string | null }) => Promise<LensVerifyResponse<User>>;
+  verifyIdToken: (idToken: string) => Promise<LensIdTokenClaims>;
+  resolveIdentity: (input: { signerAddress: string; lensAccountAddress: string }) => Promise<LensVerifiedIdentity>;
   toErrorResponse: (error: unknown) => { status: number; body: LensApiError };
+};
+
+export type LensSessionRequest = {
+  type: LensAuthIntent;
+  idToken: string;
 };

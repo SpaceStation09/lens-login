@@ -1,6 +1,6 @@
 # SDK Package Structure
 
-This document describes the current `lens-login` package split after the ID-token based refactor.
+This document describes the `lens-login` package structure and how it integrates with the demo app.
 
 ## Structure
 
@@ -8,17 +8,24 @@ This document describes the current `lens-login` package split after the ID-toke
 packages/
   lens-login/
     src/
-      client/
-      server/
-      shared/
+      client/        — wallet connection helper
+      server/        — ID token verification + account resolution
+      shared/        — shared types and utilities
 
 lib/
   lens/
-    server.ts
-    types.ts
+    api.ts           — demo app's HTTP calls to its own API routes
+    browser.ts       — browser-side Lens client + wallet helpers
+    server.ts        — demo app's login/link logic (user management, session, DB)
 ```
 
-`packages/lens-login` contains the reusable SDK-style code. `lib/lens/*` adapts it to this Next.js demo app.
+`packages/lens-login` is the reusable SDK. `lib/lens/*` is demo app glue code.
+
+## Design principles
+
+1. **Transport is not our concern.** The SDK does not dictate how your frontend communicates with your backend. The client only handles wallet connection. The server only handles verification logic. How you send data between them (REST, tRPC, GraphQL, etc.) is up to you.
+
+2. **Identity management is not our concern.** The SDK does not manage users, sessions, or storage. It verifies tokens and resolves Lens identities. How you map those identities to your own user system is up to you.
 
 ## Client
 
@@ -30,11 +37,9 @@ import { createLensLoginClient } from "@demo/lens-login/client";
 
 Responsibilities:
 
-- Connect an EVM wallet when needed.
-- Ask the app server to discover Lens accounts for a wallet.
-- Submit a Lens ID token to the app server for local login or local account binding.
+- Connect an EVM wallet via injected provider (e.g. MetaMask).
 
-The client does not create custom login challenges anymore. Lens authentication happens through the official Lens `PublicClient.login()` flow, which returns a browser-side `SessionClient` for future Lens reads and writes.
+The client does **not** make HTTP requests. It does not handle Lens login, account discovery, or session verification.
 
 ## Server
 
@@ -46,33 +51,34 @@ import { createLensLoginServer } from "@demo/lens-login/server";
 
 Responsibilities:
 
-- Discover accounts through Lens `PublicClient`.
-- Verify Lens ID tokens with Lens JWKS.
-- Derive the Lens account from verified token claims, specifically `act.sub`.
-- Map `lens:<accountAddress>` to a local user.
-- Create the app's local HTTP-only session cookie.
+- `discoverAccounts(walletAddress)` — query the Lens API for accounts managed by a wallet.
+- `verifyIdToken(idToken)` — verify the JWT signature, issuer, audience, expiration, and role; return the decoded claims.
+- `resolveIdentity({ signerAddress, lensAccountAddress })` — fetch the full Lens account profile and return a verified identity object.
+- `toErrorResponse(error)` — convert errors into HTTP-friendly responses.
 
-The server does not trust client-submitted Lens account addresses for binding. It binds the account derived from the verified ID token.
+The server does **not** manage users, sessions, or database storage. After calling `verifyIdToken` and `resolveIdentity`, you handle your own user lookup/creation, identity persistence, and session management.
 
-## Current Auth Flow
+## Auth Flow
 
 1. The browser connects MetaMask or another injected EVM wallet.
-2. The browser discovers Lens accounts controlled by that wallet.
-3. The browser calls Lens `PublicClient.login()` for the selected Lens account and obtains a `SessionClient`.
+2. The browser calls its own backend to discover Lens accounts for that wallet.
+3. The browser calls Lens `PublicClient.login()` for the selected account and obtains a `SessionClient`.
 4. The browser reads `idToken` from `sessionClient.getCredentials()`.
-5. The browser submits `{ type, idToken }` to `/api/auth/lens/session`.
-6. The server verifies the JWT signature, issuer, audience, expiration, role, and account claims.
-7. The server maps the verified Lens account to a local user and creates a local session.
+5. The browser submits `{ type, idToken }` to its own backend.
+6. The backend calls `server.verifyIdToken(idToken)` — verifies the JWT.
+7. The backend calls `server.resolveIdentity(claims)` — resolves the Lens account profile.
+8. The backend handles its own user management: look up/create user, persist identity, create session.
+
+Steps 2, 5, and 8 are the application's responsibility. The SDK provides only the Lens-specific logic (steps 6-7).
 
 ## Important Types
 
 - `LensAuthIntent`: `"login" | "link"`
-- `LensAccountsRequest`
-- `LensAccountsResponse`
-- `LensSessionRequest`
-- `LensVerifyResponse<TUser>`
-- `LensLoginClient<TUser>`
-- `LensLoginServer<TUser>`
+- `LensIdTokenClaims`: decoded token claims (signerAddress, lensAccountAddress, authenticationId, role)
+- `LensAccountsRequest` / `LensAccountsResponse`
+- `LensVerifiedIdentity`: resolved identity with providerSubject, addresses, username, metadata
+- `LensLoginClient`
+- `LensLoginServer`
 
 ## Token Claims
 
@@ -85,7 +91,7 @@ For authenticated Lens account sessions, the server expects:
 - `sid`: Lens authentication/session ID.
 - `tag:lens.dev,2024:role`: `ACCOUNT_OWNER` or `ACCOUNT_MANAGER`.
 
-Local identity subject remains the Lens account, not the wallet:
+Local identity subject is the Lens account, not the wallet:
 
 ```txt
 lens:<act.sub>

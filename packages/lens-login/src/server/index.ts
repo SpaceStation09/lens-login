@@ -7,11 +7,10 @@ import type {
   LensAccountsResponse,
   LensApiError,
   LensDiscoveredAccount,
-  LensVerifyResponse,
-  LensVerifiedIdentity,
+  LensIdTokenClaims,
   LensLoginServer,
   LensLoginServerOptions,
-  LensSessionRequest,
+  LensVerifiedIdentity,
 } from "../shared/types";
 import { LensLoginError, normalizeAddress, normalizeText } from "../shared/utils";
 
@@ -45,7 +44,7 @@ function getActSubject(payload: Record<string, unknown>) {
   return normalizeText((act as Record<string, unknown>)["sub"]);
 }
 
-export function createLensLoginServer<User extends { id: string }>(options: LensLoginServerOptions<User>): LensLoginServer<User> {
+export function createLensLoginServer(options: LensLoginServerOptions = {}): LensLoginServer {
   const environment = options.environment ?? (process.env.NEXT_PUBLIC_LENS_ENV === "mainnet" ? "mainnet" : "testnet");
   const origin = options.origin ?? process.env.NEXT_PUBLIC_APP_ORIGIN ?? "http://localhost:3000";
   const config = LENS_ENV_CONFIG[environment];
@@ -97,10 +96,7 @@ export function createLensLoginServer<User extends { id: string }>(options: Lens
     };
   }
 
-  async function resolveSessionIdentity(input: {
-    signerAddress: string;
-    lensAccountAddress: string;
-  }): Promise<LensVerifiedIdentity> {
+  async function resolveIdentity(input: { signerAddress: string; lensAccountAddress: string }): Promise<LensVerifiedIdentity> {
     const client = getLensClient();
     const accountResult = await fetchAccount(client, {
       address: input.lensAccountAddress as `0x${string}`,
@@ -125,7 +121,7 @@ export function createLensLoginServer<User extends { id: string }>(options: Lens
     };
   }
 
-  async function verifyIdToken(idToken: string) {
+  async function verifyIdToken(idToken: string): Promise<LensIdTokenClaims> {
     try {
       const result = await jwtVerify(idToken, jwks, {
         issuer: lensApiBaseUrl,
@@ -164,76 +160,6 @@ export function createLensLoginServer<User extends { id: string }>(options: Lens
     }
   }
 
-  async function persistNewIdentity(userId: string, verifiedIdentity: LensVerifiedIdentity) {
-    await options.storage.createLensIdentity({
-      userId,
-      providerSubject: verifiedIdentity.providerSubject,
-      walletAddress: verifiedIdentity.walletAddress,
-      lensAccountAddress: verifiedIdentity.lensAccountAddress,
-      lensUsernameFull: verifiedIdentity.username?.fullHandle ?? null,
-      lensUsernameLocalName: verifiedIdentity.username?.localName ?? null,
-      lensUsernameNamespace: verifiedIdentity.username?.namespace ?? null,
-      lensDisplayName: verifiedIdentity.metadata?.displayName ?? null,
-      lensPictureUrl: verifiedIdentity.metadata?.picture ?? null,
-    });
-  }
-
-  async function verifySession(input: LensSessionRequest & { currentUserId: string | null }): Promise<LensVerifyResponse<User>> {
-    const tokenIdentity = await verifyIdToken(input.idToken);
-    const verifiedIdentity = await resolveSessionIdentity({
-      signerAddress: tokenIdentity.signerAddress,
-      lensAccountAddress: tokenIdentity.lensAccountAddress,
-    });
-
-    if (input.type === "link") {
-      if (!input.currentUserId) {
-        throw new LensLoginServerError("UNAUTHORIZED", "You must be logged in to bind a Lens account.", 401);
-      }
-
-      const existing = await options.storage.getIdentityByProviderSubject(verifiedIdentity.providerSubject);
-      if (existing && existing.userId !== input.currentUserId) {
-        throw new LensLoginServerError("IDENTITY_ALREADY_LINKED", "That Lens identity is already linked to another user.");
-      }
-
-      if (!existing) {
-        await persistNewIdentity(input.currentUserId, verifiedIdentity);
-      }
-
-      const user = await options.findUserById(input.currentUserId);
-      if (!user) {
-        throw new LensLoginServerError("UNAUTHORIZED", "User session no longer exists.", 401);
-      }
-
-      return {
-        ok: true,
-        action: "link",
-        user,
-        identity: verifiedIdentity,
-        isNewUser: false,
-      };
-    }
-
-    const existing = await options.storage.getIdentityByProviderSubject(verifiedIdentity.providerSubject);
-    let user = existing ? await options.findUserById(existing.userId) : null;
-    let isNewUser = false;
-
-    if (!user) {
-      user = await options.createUser();
-      await persistNewIdentity(user.id, verifiedIdentity);
-      isNewUser = true;
-    }
-
-    await options.setSession(user);
-
-    return {
-      ok: true,
-      action: "login",
-      user,
-      identity: verifiedIdentity,
-      isNewUser,
-    };
-  }
-
   function toErrorResponse(error: unknown): { status: number; body: LensApiError } {
     if (error instanceof LensLoginServerError) {
       return {
@@ -262,7 +188,8 @@ export function createLensLoginServer<User extends { id: string }>(options: Lens
 
   return {
     discoverAccounts,
-    verifySession,
+    verifyIdToken,
+    resolveIdentity,
     toErrorResponse,
   };
 }

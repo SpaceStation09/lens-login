@@ -8,7 +8,7 @@ import { createWalletClient, custom } from "viem";
 
 import type { LensAuthIntent, LensDiscoveredAccount } from "@demo/lens-login/shared";
 import { createBrowserLensClient, getLensAppAddress, requestWalletAddress } from "@/lib/lens/browser";
-import { createLensLoginClient } from "@demo/lens-login/client";
+import { discoverLensAccounts, verifyLensSession } from "@/lib/lens/api";
 import type { PublicUser } from "@/lib/auth/public-user";
 
 type Props = {
@@ -44,28 +44,17 @@ export function LensAuthPanel({ mode }: Props) {
   const [busy, setBusy] = useState(false);
   const lensAppAddress = getLensAppAddress();
 
-  async function getLensLoginClient(requestAccountSelection: boolean) {
-    const { provider, walletAddress: connectedWallet } = await requestWalletAddress({ requestAccountSelection });
-    const client = createLensLoginClient<PublicUser>({ ethereum: provider });
-
-    return {
-      client,
-      provider,
-      walletAddress: connectedWallet,
-    };
-  }
-
   async function discoverAccounts() {
     setBusy(true);
     setError(null);
     setNotice("Connect MetaMask to load Lens accounts...");
 
     try {
-      const { client, walletAddress: connectedWallet } = await getLensLoginClient(true);
+      const { walletAddress: connectedWallet } = await requestWalletAddress({ requestAccountSelection: true });
       setWalletAddress(connectedWallet);
       setNotice("Loading Lens accounts...");
 
-      const data = await client.discoverAccounts({ walletAddress: connectedWallet });
+      const data = await discoverLensAccounts({ walletAddress: connectedWallet });
       const nextAccounts = data.accounts ?? [];
       setAccounts(nextAccounts);
 
@@ -97,7 +86,7 @@ export function LensAuthPanel({ mode }: Props) {
     setNotice("Signing Lens login challenge...");
 
     try {
-      const { client, provider, walletAddress: connectedWallet } = await getLensLoginClient(false);
+      const { provider, walletAddress: connectedWallet } = await requestWalletAddress({ requestAccountSelection: false });
 
       const walletClient = createWalletClient({
         account: evmAddress(connectedWallet),
@@ -128,7 +117,7 @@ export function LensAuthPanel({ mode }: Props) {
 
       setNotice("Verifying Lens session with the app server...");
 
-      const verified = await client.verifySession({
+      const verified = await verifyLensSession({
         type: mode,
         idToken: credentials.value.idToken,
       });

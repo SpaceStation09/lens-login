@@ -1,12 +1,4 @@
-import type {
-  LensAccountsRequest,
-  LensAccountsResponse,
-  LensApiError,
-  LensLoginClient,
-  LensLoginClientOptions,
-  LensSessionRequest,
-  LensVerifyResponse,
-} from "../shared/types";
+import type { LensLoginClient, LensLoginClientOptions } from "../shared/types";
 import { LensLoginError } from "../shared/utils";
 
 declare global {
@@ -21,23 +13,7 @@ export class LensLoginClientError extends LensLoginError {
   }
 }
 
-function getErrorObject(value: unknown) {
-  if (
-    typeof value === "object" &&
-    value !== null &&
-    "error" in value &&
-    typeof value.error === "object" &&
-    value.error !== null
-  ) {
-    return value.error as Record<string, unknown>;
-  }
-  return null;
-}
-
-export function createLensLoginClient<User = unknown>(options: LensLoginClientOptions = {}): LensLoginClient<User> {
-  const apiBasePath = options.apiBasePath ?? "/api/auth/lens";
-  const fetchImpl = options.fetch ?? fetch;
-
+export function createLensLoginClient(options: LensLoginClientOptions = {}): LensLoginClient {
   function getInjectedProvider() {
     const provider = options.ethereum ?? (typeof window !== "undefined" ? window.ethereum : undefined);
 
@@ -60,38 +36,7 @@ export function createLensLoginClient<User = unknown>(options: LensLoginClientOp
     return wallet.toLowerCase();
   }
 
-  async function postJson<TResponse>(path: string, body: unknown, fallbackMessage: string): Promise<TResponse> {
-    const response = await fetchImpl(`${apiBasePath}${path}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-
-    const data = (await response.json()) as TResponse | LensApiError;
-
-    if (!response.ok) {
-      const err = getErrorObject(data);
-      const code = typeof err?.code === "string" ? err.code : "REQUEST_FAILED";
-      const message = typeof err?.message === "string" ? err.message : fallbackMessage;
-      throw new LensLoginClientError(code, message, response.status);
-    }
-
-    return data as TResponse;
-  }
-
-  async function discoverAccounts(input: LensAccountsRequest) {
-    return postJson<LensAccountsResponse>("/accounts", input, "Failed to load Lens accounts.");
-  }
-
-  async function verifySession(input: LensSessionRequest) {
-    return postJson<LensVerifyResponse<User>>("/session", input, "Lens session verification failed.");
-  }
-
   return {
     connectWallet,
-    discoverAccounts,
-    verifySession,
   };
 }
