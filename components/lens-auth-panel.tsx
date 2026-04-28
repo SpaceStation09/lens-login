@@ -6,7 +6,7 @@ import { evmAddress } from "@lens-protocol/client";
 import { signMessageWith } from "@lens-protocol/client/viem";
 import { createWalletClient, custom } from "viem";
 
-import type { LensAuthIntent, LensDiscoveredAccount } from "@/lib/lens/types";
+import type { LensAuthIntent, LensDiscoveredAccount } from "@demo/lens-login/shared";
 import { createBrowserLensClient, getLensAppAddress, requestWalletAddress } from "@/lib/lens/browser";
 import { createLensLoginClient } from "@demo/lens-login/client";
 import type { PublicUser } from "@/lib/auth/public-user";

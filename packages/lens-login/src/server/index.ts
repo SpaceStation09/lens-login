@@ -13,38 +13,27 @@ import type {
   LensLoginServerOptions,
   LensSessionRequest,
 } from "../shared/types";
-import { normalizeAddress } from "../shared/utils";
+import { LensLoginError, normalizeAddress, normalizeText } from "../shared/utils";
 
-export class LensLoginServerError extends Error {
-  code: string;
-  status: number;
-
+export class LensLoginServerError extends LensLoginError {
   constructor(code: string, message: string, status = 400) {
-    super(message);
-    this.code = code;
-    this.status = status;
+    super(code, message, status);
   }
 }
 
-function normalizeText(value: unknown) {
-  return typeof value === "string" && value.trim().length > 0 ? value : null;
-}
+const LENS_ENV_CONFIG = {
+  mainnet: {
+    apiUrl: "https://api.lens.xyz",
+    appAddress: "0x8A5Cc31180c37078e1EbA2A23c861Acf351a97cE",
+  },
+  testnet: {
+    apiUrl: "https://api.testnet.lens.xyz",
+    appAddress: "0xC75A89145d765c396fd75CbD16380Eb184Bd2ca7",
+  },
+} as const;
 
 function toProviderSubject(lensAccountAddress: string) {
   return `lens:${normalizeAddress(lensAccountAddress)}`;
-}
-
-function getLensApiBaseUrl(environment: "mainnet" | "testnet") {
-  return environment === "mainnet" ? "https://api.lens.xyz" : "https://api.testnet.lens.xyz";
-}
-
-function getDefaultLensAppAddress(environment: "mainnet" | "testnet") {
-  return environment === "mainnet" ? "0x8A5Cc31180c37078e1EbA2A23c861Acf351a97cE" : "0xC75A89145d765c396fd75CbD16380Eb184Bd2ca7";
-}
-
-function getStringClaim(payload: Record<string, unknown>, key: string) {
-  const value = payload[key];
-  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 function getActSubject(payload: Record<string, unknown>) {
@@ -53,14 +42,15 @@ function getActSubject(payload: Record<string, unknown>) {
     return null;
   }
 
-  return getStringClaim(act as Record<string, unknown>, "sub");
+  return normalizeText((act as Record<string, unknown>)["sub"]);
 }
 
 export function createLensLoginServer<User extends { id: string }>(options: LensLoginServerOptions<User>): LensLoginServer<User> {
   const environment = options.environment ?? (process.env.NEXT_PUBLIC_LENS_ENV === "mainnet" ? "mainnet" : "testnet");
   const origin = options.origin ?? process.env.NEXT_PUBLIC_APP_ORIGIN ?? "http://localhost:3000";
-  const lensApiBaseUrl = getLensApiBaseUrl(environment);
-  const lensAppAddress = normalizeAddress(options.appAddress ?? process.env.NEXT_PUBLIC_LENS_APP_ADDRESS ?? getDefaultLensAppAddress(environment));
+  const config = LENS_ENV_CONFIG[environment];
+  const lensApiBaseUrl = config.apiUrl;
+  const lensAppAddress = normalizeAddress(options.appAddress ?? process.env.NEXT_PUBLIC_LENS_APP_ADDRESS ?? config.appAddress);
   const jwks = createRemoteJWKSet(new URL(`${lensApiBaseUrl}/.well-known/jwks.json`));
 
   function getLensClient() {
@@ -141,11 +131,11 @@ export function createLensLoginServer<User extends { id: string }>(options: Lens
         issuer: lensApiBaseUrl,
       });
       const payload = result.payload as Record<string, unknown>;
-      const role = getStringClaim(payload, "tag:lens.dev,2024:role");
-      const audience = getStringClaim(payload, "aud");
-      const signerAddress = getStringClaim(payload, "sub");
+      const role = normalizeText(payload["tag:lens.dev,2024:role"]);
+      const audience = normalizeText(payload["aud"]);
+      const signerAddress = normalizeText(payload["sub"]);
       const lensAccountAddress = getActSubject(payload);
-      const authenticationId = getStringClaim(payload, "sid");
+      const authenticationId = normalizeText(payload["sid"]);
 
       if (!audience || normalizeAddress(audience) !== lensAppAddress) {
         throw new LensLoginServerError("INVALID_ID_TOKEN", "Lens ID token was not issued for this app.", 401);

@@ -7,6 +7,7 @@ import type {
   LensSessionRequest,
   LensVerifyResponse,
 } from "../shared/types";
+import { LensLoginError } from "../shared/utils";
 
 declare global {
   interface Window {
@@ -14,47 +15,23 @@ declare global {
   }
 }
 
-export class LensLoginClientError extends Error {
-  code: string;
-  status?: number;
-
+export class LensLoginClientError extends LensLoginError {
   constructor(code: string, message: string, status?: number) {
-    super(message);
-    this.code = code;
-    this.status = status;
+    super(code, message, status ?? 0);
   }
 }
 
-function getErrorMessage(value: unknown, fallback: string) {
+function getErrorObject(value: unknown) {
   if (
     typeof value === "object" &&
     value !== null &&
     "error" in value &&
     typeof value.error === "object" &&
-    value.error !== null &&
-    "message" in value.error &&
-    typeof value.error.message === "string"
+    value.error !== null
   ) {
-    return value.error.message;
+    return value.error as Record<string, unknown>;
   }
-
-  return fallback;
-}
-
-function getErrorCode(value: unknown, fallback: string) {
-  if (
-    typeof value === "object" &&
-    value !== null &&
-    "error" in value &&
-    typeof value.error === "object" &&
-    value.error !== null &&
-    "code" in value.error &&
-    typeof value.error.code === "string"
-  ) {
-    return value.error.code;
-  }
-
-  return fallback;
+  return null;
 }
 
 export function createLensLoginClient<User = unknown>(options: LensLoginClientOptions = {}): LensLoginClient<User> {
@@ -95,7 +72,10 @@ export function createLensLoginClient<User = unknown>(options: LensLoginClientOp
     const data = (await response.json()) as TResponse | LensApiError;
 
     if (!response.ok) {
-      throw new LensLoginClientError(getErrorCode(data, "REQUEST_FAILED"), getErrorMessage(data, fallbackMessage), response.status);
+      const err = getErrorObject(data);
+      const code = typeof err?.code === "string" ? err.code : "REQUEST_FAILED";
+      const message = typeof err?.message === "string" ? err.message : fallbackMessage;
+      throw new LensLoginClientError(code, message, response.status);
     }
 
     return data as TResponse;

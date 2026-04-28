@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 
-import type { LensAuthIntent } from "@/lib/lens/types";
+import type { LensAuthIntent } from "@demo/lens-login/shared";
 
 const LensAuthPanel = dynamic(() => import("@/components/lens-auth-panel").then((module) => module.LensAuthPanel), {
   ssr: false,
