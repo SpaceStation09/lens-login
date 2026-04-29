@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
 
-import type { LensAuthIntent, LensDiscoveredAccount } from "@/lib/lens/types";
-import { createLensLoginClient } from "@demo/lens-login/client";
+import type { LensAuthIntent, LensDiscoveredAccount } from "@demo/lens-login/shared";
+import { createDemoLensLoginClient, requestWalletAddress } from "@/lib/lens/browser";
+import { verifyLensSession } from "@/lib/lens/api";
 
 type Props = {
   mode: LensAuthIntent;
@@ -17,9 +17,9 @@ function getAccountLabel(account: LensDiscoveredAccount) {
     return fullHandle;
   }
 
-  const displayName = account.metadata?.displayName?.trim();
-  if (displayName) {
-    return displayName;
+  const profileName = account.metadata?.name?.trim();
+  if (profileName) {
+    return profileName;
   }
 
   const localName = account.username?.localName?.trim();
@@ -32,74 +32,25 @@ function getAccountLabel(account: LensDiscoveredAccount) {
 
 export function LensAuthPanel({ mode }: Props) {
   const router = useRouter();
-  const { ready, authenticated, login } = usePrivy();
-  const { wallets } = useWallets();
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<LensDiscoveredAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [pendingAction, setPendingAction] = useState<"discover" | "authenticate" | null>(null);
-
-  const activeWallet = useMemo(
-    () => wallets.find((wallet) => wallet.walletClientType === "privy") ?? wallets[0] ?? null,
-    [wallets],
-  );
-
-  async function getLensLoginClient(action: "discover" | "authenticate") {
-    if (!ready) {
-      setNotice("Initializing Privy...");
-      return null;
-    }
-
-    if (!authenticated || !activeWallet) {
-      setPendingAction(action);
-      setNotice("Continue in the Privy modal to connect your wallet.");
-      await login();
-      return null;
-    }
-
-    const provider = await activeWallet.getEthereumProvider();
-
-    return {
-      client: createLensLoginClient({ ethereum: provider }),
-      walletAddress: activeWallet.address.toLowerCase(),
-    };
-  }
-
-  useEffect(() => {
-    if (!pendingAction || !ready || !authenticated || !activeWallet) {
-      return;
-    }
-
-    setPendingAction(null);
-
-    if (pendingAction === "discover") {
-      void discoverAccounts();
-      return;
-    }
-
-    if (pendingAction === "authenticate" && selectedAccount) {
-      void continueWithLens();
-    }
-  }, [pendingAction, ready, authenticated, activeWallet, selectedAccount]);
 
   async function discoverAccounts() {
     setBusy(true);
     setError(null);
-    setNotice(ready ? "Loading Lens accounts..." : "Initializing Privy...");
+    setNotice("Connect MetaMask to load Lens accounts...");
 
     try {
-      const result = await getLensLoginClient("discover");
-      if (!result) {
-        return;
-      }
-
-      const { client, walletAddress: connectedWallet } = result;
+      const { walletAddress: connectedWallet } = await requestWalletAddress({ requestAccountSelection: true });
+      const lensLoginClient = createDemoLensLoginClient();
       setWalletAddress(connectedWallet);
+      setNotice("Loading Lens accounts...");
 
-      const data = await client.discoverAccounts({ walletAddress: connectedWallet });
+      const data = await lensLoginClient.listAvailableAccounts({ walletAddress: connectedWallet });
       const nextAccounts = data.accounts ?? [];
       setAccounts(nextAccounts);
 
@@ -128,23 +79,23 @@ export function LensAuthPanel({ mode }: Props) {
 
     setBusy(true);
     setError(null);
-    setNotice("Verifying Lens login...");
+    setNotice("Signing Lens login challenge...");
 
     try {
-      const result = await getLensLoginClient("authenticate");
-      if (!result) {
-        return;
-      }
-
-      const { client } = result;
-
-      await client.authenticate({
-        type: mode,
-        walletAddress,
+      const lensLoginClient = createDemoLensLoginClient();
+      const authenticated = await lensLoginClient.login({
         lensAccountAddress: selectedAccount,
+        walletAddress,
       });
 
-      router.push("/dashboard");
+      setNotice("Verifying Lens session with the app server...");
+
+      const verified = await verifyLensSession({
+        type: mode,
+        idToken: authenticated.idToken,
+      });
+
+      router.push(mode === "login" && (!verified.user.username || !verified.user.hasPassword) ? "/complete-account" : "/dashboard");
       router.refresh();
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Lens auth failed.");
@@ -156,19 +107,19 @@ export function LensAuthPanel({ mode }: Props) {
   return (
     <div className="stack">
       <div className="actions">
-        <button className="button" disabled={busy || !ready} onClick={discoverAccounts} type="button">
-          {!ready ? "Initializing Privy..." : walletAddress ? "Refresh Privy wallet" : "Login with Privy"}
+        <button className="button" disabled={busy} onClick={discoverAccounts} type="button">
+          {walletAddress ? "Refresh MetaMask wallet" : "Connect MetaMask"}
         </button>
         <button className="button-secondary" disabled={busy || !selectedAccount} onClick={continueWithLens} type="button">
           {busy ? "Working..." : mode === "login" ? "Continue with Lens" : "Bind Lens account"}
         </button>
       </div>
-      <div className="notice">Privy now supports email login plus wallet login. If the user logs in with email and has no wallet yet, Privy will create an embedded wallet for Lens auth.</div>
+      <div className="notice">Use MetaMask or another injected EVM wallet that controls a Lens account on the selected network.</div>
       {walletAddress ? <div className="notice">Wallet: {walletAddress}</div> : null}
       {accounts.length > 1 ? (
         <label>
           Lens account
-            <select onChange={(event) => setSelectedAccount(event.target.value)} value={selectedAccount}>
+          <select onChange={(event) => setSelectedAccount(event.target.value)} value={selectedAccount}>
             {accounts.map((account, index) => (
               <option key={`${account.accountAddress}-${account.username?.fullHandle ?? "unknown"}-${index}`} value={account.accountAddress}>
                 {getAccountLabel(account)}
@@ -177,11 +128,7 @@ export function LensAuthPanel({ mode }: Props) {
           </select>
         </label>
       ) : null}
-      {accounts.length === 1 ? (
-        <div className="notice">
-          Lens account: {getAccountLabel(accounts[0])}
-        </div>
-      ) : null}
+      {accounts.length === 1 ? <div className="notice">Lens account: {getAccountLabel(accounts[0])}</div> : null}
       {notice ? <div className="notice">{notice}</div> : null}
       {error ? <div className="error">{error}</div> : null}
     </div>

@@ -1,16 +1,16 @@
-import type { ChallengeRecord, IdentityRecord, SessionRecord, UserRecord } from "@/lib/db/types";
+import type { IdentityRecord, SessionRecord, UserRecord } from "@/lib/db/types";
 import { sqlite } from "@/lib/db/sqlite";
 import { createId, nowIso } from "@/lib/utils";
 function mapUser(row: {
   id: string;
-  email: string | null;
+  username: string | null;
   password_hash: string | null;
   created_at: string;
   updated_at: string;
 }): UserRecord {
   return {
     id: row.id,
-    email: row.email,
+    username: row.username,
     passwordHash: row.password_hash,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -49,32 +49,6 @@ function mapIdentity(row: {
   };
 }
 
-function mapChallenge(row: {
-  id: string;
-  type: "login" | "link";
-  nonce: string;
-  wallet_address: string;
-  lens_account_address: string;
-  message: string;
-  expires_at: string;
-  used_at: string | null;
-  created_by_user_id: string | null;
-  created_at: string;
-}): ChallengeRecord {
-  return {
-    id: row.id,
-    type: row.type,
-    nonce: row.nonce,
-    walletAddress: row.wallet_address,
-    lensAccountAddress: row.lens_account_address,
-    message: row.message,
-    expiresAt: row.expires_at,
-    usedAt: row.used_at,
-    createdByUserId: row.created_by_user_id,
-    createdAt: row.created_at,
-  };
-}
-
 function mapSession(row: {
   id: string;
   user_id: string;
@@ -89,36 +63,44 @@ function mapSession(row: {
   };
 }
 
-export async function listUsers() {
-  const rows = sqlite.prepare("SELECT * FROM users ORDER BY created_at ASC").all() as Array<Parameters<typeof mapUser>[0]>;
-  return rows.map(mapUser);
-}
-
 export async function getUserById(userId: string) {
   const row = sqlite.prepare("SELECT * FROM users WHERE id = ?").get(userId) as Parameters<typeof mapUser>[0] | undefined;
   return row ? mapUser(row) : null;
 }
 
-export async function getUserByEmail(email: string) {
-  const row = sqlite.prepare("SELECT * FROM users WHERE lower(email) = lower(?)").get(email) as Parameters<typeof mapUser>[0] | undefined;
+export async function getUserByUsername(username: string) {
+  const row = sqlite.prepare("SELECT * FROM users WHERE lower(username) = lower(?)").get(username) as Parameters<typeof mapUser>[0] | undefined;
   return row ? mapUser(row) : null;
 }
 
-export async function createUser(input: Pick<UserRecord, "email" | "passwordHash">) {
+export async function createUser(input: Pick<UserRecord, "username" | "passwordHash">) {
   const timestamp = nowIso();
   const user: UserRecord = {
     id: createId("usr"),
-    email: input.email,
+    username: input.username,
     passwordHash: input.passwordHash,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
 
   sqlite
-    .prepare("INSERT INTO users (id, email, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
-    .run(user.id, user.email, user.passwordHash, user.createdAt, user.updatedAt);
+    .prepare("INSERT INTO users (id, username, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
+    .run(user.id, user.username, user.passwordHash, user.createdAt, user.updatedAt);
 
   return user;
+}
+
+export async function completeUserAccount(userId: string, input: Pick<UserRecord, "username" | "passwordHash">) {
+  const timestamp = nowIso();
+  const result = sqlite
+    .prepare("UPDATE users SET username = ?, password_hash = ?, updated_at = ? WHERE id = ? AND username IS NULL AND password_hash IS NULL")
+    .run(input.username, input.passwordHash, timestamp, userId);
+
+  if (result.changes === 0) {
+    return null;
+  }
+
+  return getUserById(userId);
 }
 
 export async function getIdentitiesForUser(userId: string) {
@@ -171,50 +153,9 @@ export async function createLensIdentity(input: Omit<IdentityRecord, "id" | "cre
   return identity;
 }
 
-export async function createChallenge(input: Omit<ChallengeRecord, "id" | "createdAt" | "usedAt">) {
-  const challenge: ChallengeRecord = {
-    ...input,
-    id: createId("chlg"),
-    createdAt: nowIso(),
-    usedAt: null,
-  };
-
-  sqlite
-    .prepare(
-      `INSERT INTO challenges (
-        id, type, nonce, wallet_address, lens_account_address, message,
-        expires_at, used_at, created_by_user_id, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
-      challenge.id,
-      challenge.type,
-      challenge.nonce,
-      challenge.walletAddress,
-      challenge.lensAccountAddress,
-      challenge.message,
-      challenge.expiresAt,
-      challenge.usedAt,
-      challenge.createdByUserId,
-      challenge.createdAt,
-    );
-
-  return challenge;
-}
-
-export async function getChallengeById(challengeId: string) {
-  const row = sqlite.prepare("SELECT * FROM challenges WHERE id = ?").get(challengeId) as Parameters<typeof mapChallenge>[0] | undefined;
-  return row ? mapChallenge(row) : null;
-}
-
-export async function markChallengeUsed(challengeId: string) {
-  const usedAt = nowIso();
-  const result = sqlite.prepare("UPDATE challenges SET used_at = ? WHERE id = ?").run(usedAt, challengeId);
-  if (result.changes === 0) {
-    return null;
-  }
-
-  return getChallengeById(challengeId);
+export async function deleteLensIdentitiesForUser(userId: string) {
+  const result = sqlite.prepare("DELETE FROM identities WHERE user_id = ? AND provider = ?").run(userId, "lens");
+  return result.changes;
 }
 
 export async function createSession(userId: string) {

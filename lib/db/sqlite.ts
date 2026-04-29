@@ -24,7 +24,7 @@ sqlite.pragma("busy_timeout = 5000");
 sqlite.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
-    email TEXT UNIQUE,
+    username TEXT UNIQUE,
     password_hash TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -50,24 +50,6 @@ sqlite.exec(`
   CREATE INDEX IF NOT EXISTS identities_user_id_idx ON identities(user_id);
   CREATE INDEX IF NOT EXISTS identities_wallet_address_idx ON identities(wallet_address);
 
-  CREATE TABLE IF NOT EXISTS challenges (
-    id TEXT PRIMARY KEY,
-    type TEXT NOT NULL,
-    nonce TEXT NOT NULL UNIQUE,
-    wallet_address TEXT NOT NULL,
-    lens_account_address TEXT NOT NULL,
-    message TEXT NOT NULL,
-    expires_at TEXT NOT NULL,
-    used_at TEXT,
-    created_by_user_id TEXT,
-    created_at TEXT NOT NULL,
-    FOREIGN KEY(created_by_user_id) REFERENCES users(id)
-  );
-
-  CREATE INDEX IF NOT EXISTS challenges_wallet_address_idx ON challenges(wallet_address);
-  CREATE INDEX IF NOT EXISTS challenges_lens_account_address_idx ON challenges(lens_account_address);
-  CREATE INDEX IF NOT EXISTS challenges_expires_at_idx ON challenges(expires_at);
-
   CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -78,5 +60,12 @@ sqlite.exec(`
 
   CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions(user_id);
 `);
+
+const userColumns = sqlite.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>;
+if (!userColumns.some((column) => column.name === "username")) {
+  sqlite.exec("ALTER TABLE users ADD COLUMN username TEXT");
+  sqlite.exec("UPDATE users SET username = lower(email) WHERE username IS NULL AND email IS NOT NULL");
+  sqlite.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_username_idx ON users(username)");
+}
 
 export { sqlite };

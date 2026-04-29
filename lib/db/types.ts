@@ -1,6 +1,6 @@
 export type UserRecord = {
   id: string;
-  email: string | null;
+  username: string | null;
   passwordHash: string | null;
   createdAt: string;
   updatedAt: string;
@@ -22,19 +22,6 @@ export type IdentityRecord = {
   updatedAt: string;
 };
 
-export type ChallengeRecord = {
-  id: string;
-  type: "login" | "link";
-  nonce: string;
-  walletAddress: string;
-  lensAccountAddress: string;
-  message: string;
-  expiresAt: string;
-  usedAt: string | null;
-  createdByUserId: string | null;
-  createdAt: string;
-};
-
 export type SessionRecord = {
   id: string;
   userId: string;
@@ -45,6 +32,5 @@ export type SessionRecord = {
 export type DemoDatabase = {
   users: UserRecord[];
   identities: IdentityRecord[];
-  challenges: ChallengeRecord[];
   sessions: SessionRecord[];
 };
