@@ -13,8 +13,6 @@ export { LensLoginServerError };
 
 const server = createSdkServer();
 
-export const discoverAccounts = server.discoverAccounts;
-
 async function persistIdentity(userId: string, identity: LensVerifiedIdentity) {
   await createLensIdentity({
     userId,
@@ -25,7 +23,7 @@ async function persistIdentity(userId: string, identity: LensVerifiedIdentity) {
     lensUsernameFull: identity.username?.fullHandle ?? null,
     lensUsernameLocalName: identity.username?.localName ?? null,
     lensUsernameNamespace: identity.username?.namespace ?? null,
-    lensDisplayName: identity.metadata?.displayName ?? null,
+    lensDisplayName: identity.metadata?.name ?? null,
     lensPictureUrl: identity.metadata?.picture ?? null,
   });
 }

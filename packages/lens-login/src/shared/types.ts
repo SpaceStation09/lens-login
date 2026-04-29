@@ -1,5 +1,20 @@
 export type LensAuthIntent = "login" | "link";
 
+export type LensAccountMetadataAttribute = {
+  key: string;
+  type: string;
+  value: string;
+};
+
+export type LensAccountMetadata = {
+  id: string;
+  name: string | null;
+  bio: string | null;
+  picture: string | null;
+  coverPicture: string | null;
+  attributes: LensAccountMetadataAttribute[];
+};
+
 export type LensDiscoveredAccount = {
   accountAddress: string;
   username: {
@@ -7,10 +22,7 @@ export type LensDiscoveredAccount = {
     localName: string | null;
     namespace: string | null;
   } | null;
-  metadata: {
-    displayName: string | null;
-    picture: string | null;
-  } | null;
+  metadata: LensAccountMetadata | null;
 };
 
 export type LensVerifiedIdentity = {
@@ -58,10 +70,28 @@ export type LensLoginClientOptions = {
   ethereum?: {
     request: (request: { method: string; params?: unknown[] }) => Promise<unknown>;
   };
+  environment?: "mainnet" | "testnet";
+  origin?: string;
+  appAddress?: string;
+  storage?: Storage;
+};
+
+export type LensClientLoginRequest = {
+  lensAccountAddress: string;
+  walletAddress?: string;
+};
+
+export type LensClientLoginResult = {
+  walletAddress: string;
+  sessionClient: import("@lens-protocol/client").SessionClient;
+  idToken: string;
+  account: LensDiscoveredAccount;
 };
 
 export type LensLoginClient = {
   connectWallet: () => Promise<string>;
+  listAvailableAccounts: (input?: { walletAddress?: string }) => Promise<LensAccountsResponse>;
+  login: (input: LensClientLoginRequest) => Promise<LensClientLoginResult>;
 };
 
 export type LensLoginServerOptions = {

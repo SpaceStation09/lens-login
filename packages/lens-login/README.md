@@ -13,7 +13,9 @@ The SDK handles only the Lens-specific concerns (wallet, token verification, acc
 
 ## Client API
 
-The client is a lightweight wallet connection utility. It does not handle HTTP requests — that is your application's responsibility.
+The client is a lightweight browser helper for wallet connection and Lens login. It does not handle HTTP requests — that is your application's responsibility.
+
+### Typical browser flow
 
 ```ts
 import { createLensLoginClient, LensLoginClientError } from "@demo/lens-login/client"
@@ -23,7 +25,22 @@ const client = createLensLoginClient({
 })
 
 const walletAddress = await client.connectWallet()
+
+const discovered = await client.listAvailableAccounts({
+  walletAddress,
+})
+
+const authenticated = await client.login({
+  lensAccountAddress: discovered.accounts[0].accountAddress,
+  walletAddress,
+})
+
+authenticated.sessionClient
+authenticated.idToken
+authenticated.account.metadata?.name
 ```
+
+Use `authenticated.sessionClient` for subsequent Lens reads and writes. Send `authenticated.idToken` to your backend to establish your own app session.
 
 ### `createLensLoginClient(options?)`
 
@@ -32,6 +49,10 @@ Creates a Lens login client instance.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `options.ethereum` | `EIP-1193 provider` | No | An injected EVM wallet provider (e.g. `window.ethereum`). If omitted, auto-detects from the browser environment. |
+| `options.environment` | `"mainnet" \| "testnet"` | No | Lens network environment. Defaults to `"testnet"`. |
+| `options.origin` | `string` | No | App origin passed to the Lens client when needed. |
+| `options.appAddress` | `string` | No | Lens App address used during login. Defaults to the built-in app for the selected environment. |
+| `options.storage` | `Storage` | No | Storage backend for the Lens client. Defaults to `window.localStorage` in the browser. |
 
 ### `client.connectWallet()`
 
@@ -40,6 +61,39 @@ Prompts the user to connect their EVM wallet via `eth_requestAccounts`. Returns 
 Throws `LensLoginClientError` with:
 - code `"NO_WALLET"` — no injected wallet found
 - code `"NO_WALLET_ACCOUNT"` — wallet returned no account
+
+### `client.listAvailableAccounts(input?)`
+
+Lists the Lens accounts that the connected wallet can use for login.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `input.walletAddress` | `string` | No | Wallet address to query. If omitted, the client connects the injected wallet first. |
+
+Returns `LensAccountsResponse`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `walletAddress` | `string` | Queried wallet address in lowercase. |
+| `accounts` | `LensDiscoveredAccount[]` | Lens accounts owned or managed by that wallet. |
+
+### `client.login(input)`
+
+Signs in to Lens for a specific account and returns the authenticated `SessionClient`, the current `idToken`, and the resolved Lens account profile.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `input.lensAccountAddress` | `string` | Yes | The Lens account address to authenticate as. |
+| `input.walletAddress` | `string` | No | Expected connected wallet address. If provided and the injected wallet differs, throws `"WALLET_MISMATCH"`. |
+
+Returns `LensClientLoginResult`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `walletAddress` | `string` | Connected wallet address in lowercase. |
+| `sessionClient` | `SessionClient` | Authenticated Lens session client. |
+| `idToken` | `string` | Lens ID token captured at login time. Send this to your backend for verification. If you need a fresh token later, call `sessionClient.getCredentials()` again. |
+| `account` | `LensDiscoveredAccount` | Resolved Lens account, including `username` and full profile metadata. |
 
 ## Server API
 
@@ -53,6 +107,34 @@ const server = createLensLoginServer({
   origin: "https://...",
   appAddress: "0x...",
 })
+```
+
+### Typical backend flow
+
+```ts
+import { createLensLoginServer } from "@demo/lens-login/server"
+
+const server = createLensLoginServer({
+  environment: "testnet",
+  origin: "https://my-app.example",
+  appAddress: "0x...",
+})
+
+export async function verifyLensLogin(idToken: string) {
+  const claims = await server.verifyIdToken(idToken)
+  const identity = await server.resolveIdentity({
+    signerAddress: claims.signerAddress,
+    lensAccountAddress: claims.lensAccountAddress,
+  })
+
+  // Application-owned logic starts here:
+  // 1. Look up identity.providerSubject in your database
+  // 2. Create or reuse your local user
+  // 3. Persist the Lens identity fields you care about
+  // 4. Create your own session/cookie
+
+  return { claims, identity }
+}
 ```
 
 ### `createLensLoginServer(options?)`
@@ -111,7 +193,7 @@ Returns `LensVerifiedIdentity`:
 | `walletAddress` | `string` | Normalized signer wallet address. |
 | `lensAccountAddress` | `string` | Normalized Lens account address. |
 | `username` | `object \| null` | Username with `fullHandle`, `localName`, `namespace`. |
-| `metadata` | `object \| null` | Account metadata with `displayName`, `picture`. |
+| `metadata` | `object \| null` | Account metadata with `id`, `name`, `bio`, `picture`, `coverPicture`, and `attributes`. |
 
 #### `server.toErrorResponse(error)`
 
@@ -123,7 +205,7 @@ Convert any caught error into a structured HTTP-friendly response.
 
 Returns `{ status: number, body: LensApiError }`.
 
-### Typical server-side usage
+### Identity resolution only
 
 ```ts
 const tokenClaims = await server.verifyIdToken(idToken)
@@ -167,11 +249,12 @@ Import via `@demo/lens-login/shared`:
 
 | Type | Description |
 |------|-------------|
-| `LensLoginClientOptions` | Client configuration (`{ ethereum? }`) |
-| `LensLoginClient` | Returned client interface (`{ connectWallet }`) |
+| `LensLoginClientOptions` | Client configuration (`{ ethereum?, environment?, origin?, appAddress?, storage? }`) |
+| `LensLoginClient` | Returned client interface (`{ connectWallet, listAvailableAccounts, login }`) |
 | `LensLoginServerOptions` | Server configuration (`{ environment?, origin?, appAddress? }`) |
 | `LensLoginServer` | Returned server interface (`discoverAccounts`, `verifyIdToken`, `resolveIdentity`, `toErrorResponse`) |
 | `LensIdTokenClaims` | Decoded ID token claims (`signerAddress`, `lensAccountAddress`, `authenticationId`, `role`) |
+| `LensAccountMetadata` | Full account metadata shape (`id`, `name`, `bio`, `picture`, `coverPicture`, `attributes`) |
 | `LensAccountsRequest` | `{ walletAddress }` |
 | `LensAccountsResponse` | `{ walletAddress, accounts }` |
 | `LensSessionRequest` | `{ type: LensAuthIntent, idToken }` |

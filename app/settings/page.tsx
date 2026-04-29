@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 
 import { ClearLensBindingsButton } from "@/components/clear-lens-bindings-button";
-import { LensAuthEntry } from "@/components/lens-auth-entry";
+import { LensAuthPanel } from "@/components/lens-auth-panel";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getIdentitiesForUser } from "@/lib/db/store";
 
@@ -38,7 +38,7 @@ export default async function SettingsPage() {
       </section>
       <section className="card stack">
         <h2>Bind Lens account</h2>
-        <LensAuthEntry mode="link" />
+        <LensAuthPanel mode="link" />
       </section>
     </main>
   );

@@ -2,14 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { evmAddress } from "@lens-protocol/client";
-import { signMessageWith } from "@lens-protocol/client/viem";
-import { createWalletClient, custom } from "viem";
+import { createLensLoginClient } from "@demo/lens-login/client";
 
 import type { LensAuthIntent, LensDiscoveredAccount } from "@demo/lens-login/shared";
-import { createBrowserLensClient, getLensAppAddress, requestWalletAddress } from "@/lib/lens/browser";
-import { discoverLensAccounts, verifyLensSession } from "@/lib/lens/api";
-import type { PublicUser } from "@/lib/auth/public-user";
+import { getLensAppAddress, getLensEnvironment, requestWalletAddress } from "@/lib/lens/browser";
+import { verifyLensSession } from "@/lib/lens/api";
 
 type Props = {
   mode: LensAuthIntent;
@@ -21,9 +18,9 @@ function getAccountLabel(account: LensDiscoveredAccount) {
     return fullHandle;
   }
 
-  const displayName = account.metadata?.displayName?.trim();
-  if (displayName) {
-    return displayName;
+  const profileName = account.metadata?.name?.trim();
+  if (profileName) {
+    return profileName;
   }
 
   const localName = account.username?.localName?.trim();
@@ -42,7 +39,13 @@ export function LensAuthPanel({ mode }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const lensAppAddress = getLensAppAddress();
+
+  function createSdkClient() {
+    return createLensLoginClient({
+      appAddress: getLensAppAddress(),
+      environment: getLensEnvironment(),
+    });
+  }
 
   async function discoverAccounts() {
     setBusy(true);
@@ -51,10 +54,11 @@ export function LensAuthPanel({ mode }: Props) {
 
     try {
       const { walletAddress: connectedWallet } = await requestWalletAddress({ requestAccountSelection: true });
+      const lensLoginClient = createSdkClient();
       setWalletAddress(connectedWallet);
       setNotice("Loading Lens accounts...");
 
-      const data = await discoverLensAccounts({ walletAddress: connectedWallet });
+      const data = await lensLoginClient.listAvailableAccounts({ walletAddress: connectedWallet });
       const nextAccounts = data.accounts ?? [];
       setAccounts(nextAccounts);
 
@@ -86,40 +90,17 @@ export function LensAuthPanel({ mode }: Props) {
     setNotice("Signing Lens login challenge...");
 
     try {
-      const { provider, walletAddress: connectedWallet } = await requestWalletAddress({ requestAccountSelection: false });
-
-      const walletClient = createWalletClient({
-        account: evmAddress(connectedWallet),
-        transport: custom(provider),
+      const lensLoginClient = createSdkClient();
+      const authenticated = await lensLoginClient.login({
+        lensAccountAddress: selectedAccount,
+        walletAddress,
       });
-      const lensClient = createBrowserLensClient();
-      const authenticated = await lensClient.login({
-        accountOwner: {
-          account: evmAddress(selectedAccount),
-          owner: evmAddress(connectedWallet),
-          app: evmAddress(lensAppAddress),
-        },
-        signMessage: signMessageWith(walletClient),
-      });
-
-      if (authenticated.isErr()) {
-        throw authenticated.error;
-      }
-
-      const credentials = authenticated.value.getCredentials();
-      if (credentials.isErr()) {
-        throw credentials.error;
-      }
-
-      if (!credentials.value?.idToken) {
-        throw new Error("Lens session did not include an ID token.");
-      }
 
       setNotice("Verifying Lens session with the app server...");
 
       const verified = await verifyLensSession({
         type: mode,
-        idToken: credentials.value.idToken,
+        idToken: authenticated.idToken,
       });
 
       router.push(mode === "login" && (!verified.user.username || !verified.user.hasPassword) ? "/complete-account" : "/dashboard");

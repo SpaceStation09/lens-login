@@ -63,11 +63,6 @@ function mapSession(row: {
   };
 }
 
-export async function listUsers() {
-  const rows = sqlite.prepare("SELECT * FROM users ORDER BY created_at ASC").all() as Array<Parameters<typeof mapUser>[0]>;
-  return rows.map(mapUser);
-}
-
 export async function getUserById(userId: string) {
   const row = sqlite.prepare("SELECT * FROM users WHERE id = ?").get(userId) as Parameters<typeof mapUser>[0] | undefined;
   return row ? mapUser(row) : null;

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 
 import { AccountAuthForm } from "@/components/account-auth-form";
-import { LensAuthEntry } from "@/components/lens-auth-entry";
+import { LensAuthPanel } from "@/components/lens-auth-panel";
 import { getCurrentUser } from "@/lib/auth/session";
 
 export default async function LoginPage() {
@@ -30,7 +30,7 @@ export default async function LoginPage() {
       <section className="card stack">
         <h2>Login with Lens</h2>
         <p className="muted">Strict mode: only wallets that already control a Lens account can continue.</p>
-        <LensAuthEntry mode="login" />
+        <LensAuthPanel mode="login" />
       </section>
     </main>
   );

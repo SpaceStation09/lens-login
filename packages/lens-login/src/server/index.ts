@@ -12,7 +12,7 @@ import type {
   LensLoginServerOptions,
   LensVerifiedIdentity,
 } from "../shared/types";
-import { LensLoginError, normalizeAddress, normalizeText } from "../shared/utils";
+import { LensLoginError, normalizeAddress, normalizeText, toDiscoveredAccount } from "../shared/utils";
 
 export class LensLoginServerError extends LensLoginError {
   constructor(code: string, message: string, status = 400) {
@@ -59,25 +59,6 @@ export function createLensLoginServer(options: LensLoginServerOptions = {}): Len
     });
   }
 
-  function toAccountView(item: any): LensDiscoveredAccount {
-    const account = item.account ?? item;
-
-    return {
-      accountAddress: account.address,
-      username: account.username
-        ? {
-            fullHandle: normalizeText(account.username.value),
-            localName: normalizeText(account.username.localName),
-            namespace: normalizeText(account.username.namespace),
-          }
-        : null,
-      metadata: {
-        displayName: normalizeText(account.metadata?.name),
-        picture: normalizeText(account.metadata?.picture),
-      },
-    };
-  }
-
   async function discoverAccounts(input: LensAccountsRequest): Promise<LensAccountsResponse> {
     const client = getLensClient();
     const walletAddress = normalizeAddress(input.walletAddress);
@@ -92,7 +73,7 @@ export function createLensLoginServer(options: LensLoginServerOptions = {}): Len
 
     return {
       walletAddress,
-      accounts: result.value.items.map(toAccountView),
+      accounts: result.value.items.map(toDiscoveredAccount),
     };
   }
 
@@ -110,7 +91,7 @@ export function createLensLoginServer(options: LensLoginServerOptions = {}): Len
       throw new LensLoginServerError("INVALID_ID_TOKEN", "Lens account from ID token was not found.", 401);
     }
 
-    const account = toAccountView(accountResult.value);
+    const account = toDiscoveredAccount(accountResult.value);
 
     return {
       providerSubject: toProviderSubject(account.accountAddress),

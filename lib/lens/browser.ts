@@ -1,7 +1,5 @@
 "use client";
 
-import { PublicClient, mainnet, testnet } from "@lens-protocol/client";
-
 import type { LensLoginClientOptions } from "@demo/lens-login/shared";
 
 export const defaultLensAppByEnvironment = {
@@ -15,15 +13,6 @@ export function getLensEnvironment() {
 
 export function getLensAppAddress() {
   return process.env.NEXT_PUBLIC_LENS_APP_ADDRESS ?? defaultLensAppByEnvironment[getLensEnvironment()];
-}
-
-export function createBrowserLensClient(options: { environment?: "mainnet" | "testnet" } = {}) {
-  const environment = options.environment ?? getLensEnvironment();
-
-  return PublicClient.create({
-    environment: environment === "mainnet" ? mainnet : testnet,
-    storage: window.localStorage,
-  });
 }
 
 export function getInjectedProvider() {

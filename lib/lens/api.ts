@@ -1,6 +1,4 @@
 import type {
-  LensAccountsRequest,
-  LensAccountsResponse,
   LensApiError,
   LensAuthIntent,
   LensSessionRequest,
@@ -34,10 +32,6 @@ async function postJson<TResponse>(path: string, body: unknown, fallbackMessage:
   }
 
   return data as TResponse;
-}
-
-export function discoverLensAccounts(input: LensAccountsRequest) {
-  return postJson<LensAccountsResponse>("/accounts", input, "Failed to load Lens accounts.");
 }
 
 export function verifyLensSession(input: LensSessionRequest) {
