@@ -131,5 +131,4 @@ If you land on `/complete-account`:
 
 ## Documentation
 
-- [`docs/sdk-package-structure.md`](docs/sdk-package-structure.md) — SDK architecture, auth flow, and types
 - [`packages/lens-login/README.md`](packages/lens-login/README.md) — SDK API reference

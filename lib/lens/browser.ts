@@ -1,5 +1,6 @@
 "use client";
 
+import { createLensLoginClient } from "@demo/lens-login/client";
 import type { LensLoginClientOptions } from "@demo/lens-login/shared";
 
 export const defaultLensAppByEnvironment = {
@@ -13,6 +14,14 @@ export function getLensEnvironment() {
 
 export function getLensAppAddress() {
   return process.env.NEXT_PUBLIC_LENS_APP_ADDRESS ?? defaultLensAppByEnvironment[getLensEnvironment()];
+}
+
+export function createDemoLensLoginClient(options: Pick<LensLoginClientOptions, "ethereum" | "storage"> = {}) {
+  return createLensLoginClient({
+    ...options,
+    appAddress: getLensAppAddress(),
+    environment: getLensEnvironment(),
+  });
 }
 
 export function getInjectedProvider() {

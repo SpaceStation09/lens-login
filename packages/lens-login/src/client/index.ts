@@ -79,6 +79,19 @@ export function createLensLoginClient(options: LensLoginClientOptions = {}): Len
     };
   }
 
+  async function getAccount(input: { lensAccountAddress: string }) {
+    const client = getLensClient();
+    const accountResult = await fetchAccount(client, {
+      address: evmAddress(normalizeAddress(input.lensAccountAddress)),
+    });
+
+    if (accountResult.isErr()) {
+      throw new LensLoginClientError("ACCOUNT_FETCH_FAILED", "Failed to fetch the Lens account.");
+    }
+
+    return accountResult.value ? toDiscoveredAccount(accountResult.value) : null;
+  }
+
   async function login(input: LensClientLoginRequest) {
     const provider = getInjectedProvider();
     const walletAddress = await connectWallet();
@@ -116,29 +129,17 @@ export function createLensLoginClient(options: LensLoginClientOptions = {}): Len
       throw new LensLoginClientError("NO_ID_TOKEN", "Lens session did not include an ID token.");
     }
 
-    const accountResult = await fetchAccount(client, {
-      address: evmAddress(lensAccountAddress),
-    });
-
-    if (accountResult.isErr()) {
-      throw new LensLoginClientError("ACCOUNT_FETCH_FAILED", "Failed to fetch the Lens account after login.");
-    }
-
-    if (!accountResult.value) {
-      throw new LensLoginClientError("ACCOUNT_NOT_FOUND", "The Lens account used for login could not be found.");
-    }
-
     return {
       walletAddress,
       sessionClient: authenticated.value,
       idToken: credentials.value.idToken,
-      account: toDiscoveredAccount(accountResult.value),
     };
   }
 
   return {
     connectWallet,
     listAvailableAccounts,
+    getAccount,
     login,
   };
 }

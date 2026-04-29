@@ -2,10 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createLensLoginClient } from "@demo/lens-login/client";
 
 import type { LensAuthIntent, LensDiscoveredAccount } from "@demo/lens-login/shared";
-import { getLensAppAddress, getLensEnvironment, requestWalletAddress } from "@/lib/lens/browser";
+import { createDemoLensLoginClient, requestWalletAddress } from "@/lib/lens/browser";
 import { verifyLensSession } from "@/lib/lens/api";
 
 type Props = {
@@ -40,13 +39,6 @@ export function LensAuthPanel({ mode }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  function createSdkClient() {
-    return createLensLoginClient({
-      appAddress: getLensAppAddress(),
-      environment: getLensEnvironment(),
-    });
-  }
-
   async function discoverAccounts() {
     setBusy(true);
     setError(null);
@@ -54,7 +46,7 @@ export function LensAuthPanel({ mode }: Props) {
 
     try {
       const { walletAddress: connectedWallet } = await requestWalletAddress({ requestAccountSelection: true });
-      const lensLoginClient = createSdkClient();
+      const lensLoginClient = createDemoLensLoginClient();
       setWalletAddress(connectedWallet);
       setNotice("Loading Lens accounts...");
 
@@ -90,7 +82,7 @@ export function LensAuthPanel({ mode }: Props) {
     setNotice("Signing Lens login challenge...");
 
     try {
-      const lensLoginClient = createSdkClient();
+      const lensLoginClient = createDemoLensLoginClient();
       const authenticated = await lensLoginClient.login({
         lensAccountAddress: selectedAccount,
         walletAddress,

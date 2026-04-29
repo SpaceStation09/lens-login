@@ -85,12 +85,12 @@ export type LensClientLoginResult = {
   walletAddress: string;
   sessionClient: import("@lens-protocol/client").SessionClient;
   idToken: string;
-  account: LensDiscoveredAccount;
 };
 
 export type LensLoginClient = {
   connectWallet: () => Promise<string>;
   listAvailableAccounts: (input?: { walletAddress?: string }) => Promise<LensAccountsResponse>;
+  getAccount: (input: { lensAccountAddress: string }) => Promise<LensDiscoveredAccount | null>;
   login: (input: LensClientLoginRequest) => Promise<LensClientLoginResult>;
 };
 

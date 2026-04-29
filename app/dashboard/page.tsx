@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 
+import { LensAccountMetadataCard } from "@/components/lens-account-metadata-card";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getIdentitiesForUser } from "@/lib/db/store";
 
@@ -19,8 +20,18 @@ export default async function DashboardPage() {
   const lensIdentity = identities.find((identity) => identity.provider === "lens");
 
   return (
-    <main className="grid">
-      <section className="card stack">
+    <main className="dashboard-layout">
+      {lensIdentity ? (
+        <section className="card stack dashboard-profile-card">
+          <div className="stack-tight">
+            <span className="pill">Profile theme</span>
+            <h2>Live Lens account metadata</h2>
+            <p className="muted">This section fetches the latest profile data from the Lens API instead of reusing login-time metadata.</p>
+          </div>
+          <LensAccountMetadataCard lensAccountAddress={lensIdentity.lensAccountAddress} />
+        </section>
+      ) : null}
+      <section className="card stack dashboard-main-card">
         <span className="pill">Current user</span>
         <h1>Dashboard</h1>
         <div className="kv">
@@ -32,7 +43,7 @@ export default async function DashboardPage() {
           <div>{new Date(user.createdAt).toLocaleString()}</div>
         </div>
       </section>
-      <section className="card stack">
+      <section className="card stack dashboard-side-card">
         <span className="pill">Identity mapping</span>
         <h2>Lens binding status</h2>
         {lensIdentity ? (

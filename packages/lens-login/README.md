@@ -37,10 +37,15 @@ const authenticated = await client.login({
 
 authenticated.sessionClient
 authenticated.idToken
-authenticated.account.metadata?.name
+
+const liveAccount = await client.getAccount({
+  lensAccountAddress: discovered.accounts[0].accountAddress,
+})
+
+liveAccount?.metadata?.name
 ```
 
-Use `authenticated.sessionClient` for subsequent Lens reads and writes. Send `authenticated.idToken` to your backend to establish your own app session.
+Use `authenticated.sessionClient` for subsequent Lens reads and writes. Send `authenticated.idToken` to your backend to establish your own app session. Query account metadata through `client.getAccount()` whenever you need a fresh profile snapshot.
 
 ### `createLensLoginClient(options?)`
 
@@ -79,7 +84,7 @@ Returns `LensAccountsResponse`:
 
 ### `client.login(input)`
 
-Signs in to Lens for a specific account and returns the authenticated `SessionClient`, the current `idToken`, and the resolved Lens account profile.
+Signs in to Lens for a specific account and returns the authenticated `SessionClient` plus the current `idToken`.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -93,7 +98,16 @@ Returns `LensClientLoginResult`:
 | `walletAddress` | `string` | Connected wallet address in lowercase. |
 | `sessionClient` | `SessionClient` | Authenticated Lens session client. |
 | `idToken` | `string` | Lens ID token captured at login time. Send this to your backend for verification. If you need a fresh token later, call `sessionClient.getCredentials()` again. |
-| `account` | `LensDiscoveredAccount` | Resolved Lens account, including `username` and full profile metadata. |
+
+### `client.getAccount(input)`
+
+Fetches the latest Lens account profile for a specific account address.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `input.lensAccountAddress` | `string` | Yes | The Lens account address to read. |
+
+Returns `LensDiscoveredAccount | null`.
 
 ## Server API
 
@@ -250,7 +264,7 @@ Import via `@demo/lens-login/shared`:
 | Type | Description |
 |------|-------------|
 | `LensLoginClientOptions` | Client configuration (`{ ethereum?, environment?, origin?, appAddress?, storage? }`) |
-| `LensLoginClient` | Returned client interface (`{ connectWallet, listAvailableAccounts, login }`) |
+| `LensLoginClient` | Returned client interface (`{ connectWallet, listAvailableAccounts, getAccount, login }`) |
 | `LensLoginServerOptions` | Server configuration (`{ environment?, origin?, appAddress? }`) |
 | `LensLoginServer` | Returned server interface (`discoverAccounts`, `verifyIdToken`, `resolveIdentity`, `toErrorResponse`) |
 | `LensIdTokenClaims` | Decoded ID token claims (`signerAddress`, `lensAccountAddress`, `authenticationId`, `role`) |
