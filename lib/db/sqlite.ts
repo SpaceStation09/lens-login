@@ -61,11 +61,4 @@ sqlite.exec(`
   CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions(user_id);
 `);
 
-const userColumns = sqlite.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>;
-if (!userColumns.some((column) => column.name === "username")) {
-  sqlite.exec("ALTER TABLE users ADD COLUMN username TEXT");
-  sqlite.exec("UPDATE users SET username = lower(email) WHERE username IS NULL AND email IS NOT NULL");
-  sqlite.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_username_idx ON users(username)");
-}
-
 export { sqlite };
